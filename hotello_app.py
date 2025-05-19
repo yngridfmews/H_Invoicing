@@ -5,23 +5,23 @@ import io
 
 st.set_page_config(page_title="Hotello Invoice Generator", layout="centered")
 st.title("📊 Hotello Invoice Generator")
-st.write("Envie os arquivos necessários e receba automaticamente o Excel final de importação.")
+st.write("Upload the files below.")
 
-# Upload dos arquivos
-chargebee_file = st.file_uploader("🔷 ChargeBee Export (.xlsx)", type="xlsx")
-quickbooks_file = st.file_uploader("🟢 QuickBooks Export (.xlsx)", type="xlsx")
-bridge_file = st.file_uploader("🟣 Bridge (.xlsx)", type="xlsx")
-customers_file = st.file_uploader("🟡 Customers_MI (.xlsx)", type="xlsx")
+# Upload files
+chargebee_file = st.file_uploader("ChargeBee Export (.xlsx)", type="xlsx")
+quickbooks_file = st.file_uploader("QuickBooks Export (.xlsx)", type="xlsx")
+bridge_file = st.file_uploader("Bridge (.xlsx)", type="xlsx")
+customers_file = st.file_uploader("Customers_MI (.xlsx)", type="xlsx")
 
 if chargebee_file and quickbooks_file and bridge_file and customers_file:
     try:
-        # 🔄 Leitura
+        # Read
         df_chargebee = pd.read_excel(chargebee_file)
         df_qb = pd.read_excel(quickbooks_file, header=3)
         df_bridge = pd.read_excel(bridge_file)
         df_customers_mi = pd.read_excel(customers_file)
 
-        # 🔧 Normalizações iniciais
+        # Initial normalization 
         df_bridge.columns = df_bridge.columns.str.strip()
         df_customers_mi.columns = df_customers_mi.columns.str.strip()
 
@@ -50,7 +50,7 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
         df_final['Parent/Customer No.'] = df_final['customer_temp'].map(full_bridge_lookup).fillna('CHECK')
         df_final.drop(columns=['customer_temp'], inplace=True)
 
-        # Colunas adicionais
+        # Additional columns
         df_final.insert(2, 'Subaccount', '')
         df_final['Document Date'] = df_qb['Date']
         df_final['Posting Date'] = df_qb['Date']
@@ -65,15 +65,15 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
         df_final['Due Date'] = df_final['Document Date'] + pd.to_timedelta(days_to_add, unit='D')
         df_final['VAT Date'] = df_qb['Date']
 
-        # Coluna H
+        # Column H
         df_chargebee['Currency'] = df_chargebee['Currency'].astype(str).str.strip()
         currency_lookup = df_chargebee.set_index('Invoice Number')['Currency'].to_dict()
         df_final['Currency Code'] = df_final['Invoice No.'].map(currency_lookup).apply(lambda x: "" if x == "CAD" else x)
 
-        # I - Type
+        # Column I - Type
         df_final['Type'] = 'Item'
 
-        # J - No.
+        # Column J - No.
         df_bridge['Account number'] = df_bridge['Account number'].astype(str).str.strip()
         df_bridge['Item'] = df_bridge['Item'].astype(str).str.strip()
         account_to_item = dict(zip(df_bridge['Account number'], df_bridge['Item']))
@@ -95,13 +95,13 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
 
         df_final['No.'] = df_final.apply(compute_no, axis=1)
 
-        # K - Description
+        # Column K - Description
         df_final['Description'] = df_qb['Product/service description']
 
-        # L - Quantity
+        # Column L - Quantity
         df_final['Quantity'] = 1
 
-        # M - Unit Price Excl. VAT
+        # Column M - Unit Price Excl. VAT
         df_chargebee['Unit Amount'] = pd.to_numeric(df_chargebee['Unit Amount'], errors='coerce')
         df_chargebee['Discount'] = pd.to_numeric(df_chargebee['Discount'], errors='coerce')
         df_qb['Product/service amount line'] = pd.to_numeric(df_qb['Product/service amount line'], errors='coerce')
@@ -119,37 +119,37 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
 
         df_final['Unit Price Excl. VAT'] = df_final.apply(get_unit_price, axis=1)
 
-        # N - VAT Prod. Posting Group
+        # Column N - VAT Prod. Posting Group
         df_final['VAT Prod. Posting Group'] = ''
 
-        # P - Deferral Start Date
+        # Column P - Deferral Start Date
         df_chargebee['Date From'] = pd.to_datetime(df_chargebee['Date From'], errors='coerce')
         deferral_start_lookup = df_chargebee.set_index('Invoice Number')['Date From'].to_dict()
         df_final['Deferral Start Date'] = df_final['Invoice No.'].map(deferral_start_lookup).fillna('CHECK')
 
-        # O - Deferral Code
+        # Column O - Deferral Code
         df_final['Deferral Code'] = df_final['Deferral Start Date'].apply(lambda x: 'AR' if pd.notna(x) and str(x).strip() != '' else '')
 
-        # Q - Deferral End Date
+        # Column Q - Deferral End Date
         df_chargebee['Date To'] = pd.to_datetime(df_chargebee['Date To'], errors='coerce')
         deferral_end_lookup = df_chargebee.set_index('Invoice Number')['Date To'].to_dict()
         df_final['Deferral End Date'] = df_final['Invoice No.'].map(deferral_end_lookup).fillna('CHECK')
 
-        # Gerar Excel em memória
+        # Generating final Excel 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df_final.to_excel(writer, index=False, sheet_name="InvoiceData")
         output.seek(0)
 
-        st.success("✅ Arquivo gerado com sucesso!")
+        st.success(" File generated")
         st.download_button(
-            label="📥 Baixar Excel de Importação",
+            label="📥 Download File",
             data=output,
             file_name=f"Test_Hotello_Import_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     except Exception as e:
-        st.error(f"Erro durante o processamento: {e}")
+        st.error(f"Error during the process: {e}")
 else:
-    st.info("⏳ Por favor, envie os 4 arquivos para habilitar o botão de download.")
+    st.info("⏳ Please, all the needed files")
