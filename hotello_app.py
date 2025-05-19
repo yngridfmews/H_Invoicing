@@ -111,7 +111,7 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
         def get_unit_price(row):
             if row['Currency Code'] == "":
                 return df_qb.loc[row.name, 'Product/service amount line']
-            elif row['Description'].strip().lower() == "discount":
+            elif str(row['Description']).strip().lower() == "discount":
                 match = df_chargebee[df_chargebee['Invoice Number'] == row['Invoice No.']]
                 return match['Discount'].sum() if not match.empty else 0
             else:
