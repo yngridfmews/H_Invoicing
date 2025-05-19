@@ -3,6 +3,9 @@ import pandas as pd
 from datetime import datetime
 import io
 
+# Isso tem que vir logo após os imports!
+st.set_page_config(page_title="Hotello Invoice Generator", layout="centered")
+
 # --- AUTH via st.secrets ---
 def login():
     st.title("🔐 Login")
@@ -17,7 +20,6 @@ def login():
 if not login():
     st.stop()
 
-st.set_page_config(page_title="Hotello Invoice Generator", layout="centered")
 st.title("📊 Hotello Invoice Generator")
 st.write("Upload the files below.")
 
