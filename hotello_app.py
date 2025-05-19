@@ -152,4 +152,4 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
     except Exception as e:
         st.error(f"Error during the process: {e}")
 else:
-    st.info("⏳ Please, all the needed files")
+    st.info("⏳ Please, upload all the needed files above")
