@@ -151,6 +151,47 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
         deferral_end_lookup = df_chargebee.set_index('Invoice Number')['Date To'].to_dict()
         df_final['Deferral End Date'] = df_final['Invoice No.'].map(deferral_end_lookup).fillna('CHECK')
 
+        #Final checks deferrals
+
+        #1. Small amounts
+        # "Unit Price Excl. VAT" to numeric
+        df_final['Unit Price Excl. VAT'] = pd.to_numeric(df_final['Unit Price Excl. VAT'], errors='coerce')
+
+        # < 0.05 E deferral start ≠ end
+        mask_small_amount_and_deferral = (
+        (df_final['Unit Price Excl. VAT'].abs() < 0.05) &
+        (df_final['Deferral Start Date'] != df_final['Deferral End Date'])
+        )
+
+        # clean columns O, P, Q
+        df_final.loc[mask_small_amount_and_deferral, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
+
+        #2. Incorrect Deferral dates
+        df_chargebee['Invoice Number'] = df_chargebee['Invoice Number'].astype(str).str.strip().str.lower()
+        df_chargebee['Date From'] = pd.to_datetime(df_chargebee['Date From'], errors='coerce')
+        df_chargebee['Date To'] = pd.to_datetime(df_chargebee['Date To'], errors='coerce')
+
+        # Correct Invoice No. no df_final
+        df_final['Invoice No.'] = df_final['Invoice No.'].astype(str).str.strip().str.lower()
+
+        # merge the dates to the df_final 
+        df_final = df_final.merge(
+        df_chargebee[['Invoice Number', 'Date From', 'Date To']],
+        left_on='Invoice No.',
+        right_on='Invoice Number',
+        how='left'
+        )
+
+        df_final['Deferral Start Date'] = df_final['Date From'].fillna('CHECK')
+        df_final['Deferral End Date'] = df_final['Date To'].fillna('CHECK')
+
+        # New Deferral Code using the new 'Deferral Start Date'
+        df_final['Deferral Code'] = df_final['Deferral Start Date'].apply(
+            lambda x: 'AR' if pd.notna(x) and str(x).strip() != '' else ''
+        )
+
+        df_final.drop(columns=['Invoice Number', 'Date From', 'Date To'], inplace=True)
+
         # Generating final Excel 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
