@@ -3,6 +3,20 @@ import pandas as pd
 from datetime import datetime
 import io
 
+# --- AUTH via st.secrets ---
+def login():
+    st.title("🔐 Login")
+    password = st.text_input("Enter password to access the app:", type="password")
+    if password == st.secrets["auth_password"]:
+        return True
+    elif password:
+        st.error("❌ Incorrect password")
+        return False
+    return False
+
+if not login():
+    st.stop()
+
 st.set_page_config(page_title="Hotello Invoice Generator", layout="centered")
 st.title("📊 Hotello Invoice Generator")
 st.write("Upload the files below.")
