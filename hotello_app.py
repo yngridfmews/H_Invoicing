@@ -140,51 +140,33 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
 
         # Column P - Deferral Start Date
         df_chargebee['Date From'] = pd.to_datetime(df_chargebee['Date From'], errors='coerce')
-        deferral_start_lookup = df_chargebee.set_index('Invoice Number')['Date From'].to_dict()
-        df_final['Deferral Start Date'] = df_final['Invoice No.'].map(deferral_start_lookup).fillna('CHECK')
+        df_chargebee['Date To'] = pd.to_datetime(df_chargebee['Date To'], errors='coerce')
+        df_dates = df_chargebee.groupby('Invoice Number')[['Date From', 'Date To']].first().reset_index()
 
-        # Column O - Deferral Code
-        df_final['Deferral Code'] = df_final['Deferral Start Date'].apply(lambda x: 'AR' if pd.notna(x) and str(x).strip() != '' else '')
-
-        # Column Q - Deferral End Date
-        # Simula XLOOKUP: busca Invoice No. na coluna 'Invoice Number' da ChargeBee para trazer 'Date To'
         df_final = df_final.merge(
-            df_chargebee[['Invoice Number', 'Date From', 'Date To']],
+            df_dates,
             left_on='Invoice No.',
             right_on='Invoice Number',
             how='left'
         )
 
-        # Deferral columns (como fórmula do Excel faria)
         df_final['Deferral Start Date'] = df_final['Date From'].fillna('CHECK')
         df_final['Deferral End Date'] = df_final['Date To'].fillna('CHECK')
         df_final['Deferral Code'] = df_final['Deferral Start Date'].apply(
             lambda x: 'AR' if pd.notna(x) and str(x).strip() != '' else ''
         )
 
-        #Final checks deferrals
-
-        #1. Small amounts
-        # "Unit Price Excl. VAT" to numeric
+        # Small values
         df_final['Unit Price Excl. VAT'] = pd.to_numeric(df_final['Unit Price Excl. VAT'], errors='coerce')
-
-        # < 0.05 E deferral start ≠ end
         mask_small_amount_and_deferral = (
-        (df_final['Unit Price Excl. VAT'].abs() < 0.05) &
-        (df_final['Deferral Start Date'] != df_final['Deferral End Date'])
+            (df_final['Unit Price Excl. VAT'].abs() < 0.05) &
+            (df_final['Deferral Start Date'] != df_final['Deferral End Date'])
         )
-
-        # clean columns O, P, Q
         df_final.loc[mask_small_amount_and_deferral, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
 
-        #2. Incorrect Deferral dates
-        df_final['Deferral Start Date'] = df_final['Date From'].fillna('CHECK')
-        df_final['Deferral End Date'] = df_final['Date To'].fillna('CHECK')
-        df_final['Deferral Code'] = df_final['Deferral Start Date'].apply(
-            lambda x: 'AR' if pd.notna(x) and str(x).strip() != '' else ''
-        )
+        # Correct deferral dates if more than 1 invoice
 
-        # Generating final Excel 
+        # Exportar para Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df_final.to_excel(writer, index=False, sheet_name="InvoiceData")
