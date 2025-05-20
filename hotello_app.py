@@ -3,26 +3,33 @@ import pandas as pd
 from datetime import datetime
 import io
 
-# Isso tem que vir logo após os imports!
-st.set_page_config(page_title="Hotello Invoice Generator", layout="centered")
+# Configuração da página
+st.set_page_config(page_title="Hotello App", layout="wide")
 
-# --- AUTH via st.secrets ---
+# Sidebar com menu
+menu = st.sidebar.radio("Escolha a seção:", ["Invoice", "Credit Notes"])
+
+# --- AUTH ---
 def login():
-    st.title("🔐 Login")
-    password = st.text_input("Enter password to access the app:", type="password")
+    st.sidebar.markdown("### Login")
+    password = st.sidebar.text_input("Enter password:", type="password")
     if password == st.secrets["auth_password"]:
         return True
     elif password:
-        st.error("❌ Incorrect password")
+        st.sidebar.error("Incorrect password")
         return False
     return False
 
 if not login():
     st.stop()
 
-st.title("📊 Hotello Invoice Generator")
-st.write("Upload the files below.")
-
+# ================================
+# INVOICE SECTION
+# ================================
+if menu == "Invoice":
+    st.title("📊 Hotello Invoice Generator")
+    st.write("Upload the files below for Invoice processing.")
+    
 # Upload files
 chargebee_file = st.file_uploader("ChargeBee Export (.xlsx)", type="xlsx")
 quickbooks_file = st.file_uploader("QuickBooks Export (.xlsx)", type="xlsx")
