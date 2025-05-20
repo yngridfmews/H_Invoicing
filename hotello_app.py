@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Hotello App", layout="wide")
 
 # Sidebar com menu
-menu = st.sidebar.radio("Escolha a seção:", ["Invoice", "Credit Notes"])
+menu = st.sidebar.radio("Menu:", ["Invoice", "Credit Notes"])
 
 # --- AUTH ---
 def login():
@@ -29,7 +29,7 @@ if not login():
 if menu == "Invoice":
     st.title("📊 Hotello Invoice Generator")
     st.write("Upload the files below for Invoice processing.")
-    
+
 # Upload files
 chargebee_file = st.file_uploader("ChargeBee Export (.xlsx)", type="xlsx")
 quickbooks_file = st.file_uploader("QuickBooks Export (.xlsx)", type="xlsx")
@@ -189,5 +189,132 @@ if chargebee_file and quickbooks_file and bridge_file and customers_file:
 
     except Exception as e:
         st.error(f"Error during the process: {e}")
-else:
-    st.info("⏳ Please, upload all the needed files above")
+    else:
+        st.info("⏳ Please, upload all the needed files above")
+
+
+# ================================
+# CREDIT NOTES SECTION
+# ================================
+# ================================
+# CREDIT NOTES SECTION
+# ================================
+elif menu == "Credit Notes":
+    st.title("📉 Hotello Credit Notes Generator")
+    st.write("Upload the files below for Credit Notes processing.")
+
+    chargebee_file = st.file_uploader("ChargeBee Export (.xlsx)", type="xlsx", key="cb_credit")
+    quickbooks_file = st.file_uploader("QuickBooks Export (.xlsx)", type="xlsx", key="qb_credit")
+    bridge_file = st.file_uploader("Bridge (.xlsx)", type="xlsx", key="bridge_credit")
+
+    if chargebee_file and quickbooks_file and bridge_file:
+        try:
+            import unicodedata
+
+            df_cb_cm = pd.read_excel(chargebee_file)
+            df_qb_cm = pd.read_excel(quickbooks_file, header=3)
+            df_bridgecm = pd.read_excel(bridge_file)
+
+            # Normalizacao das colunas principais
+            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].astype(str).str.strip()
+            df_cb_cm['Description'] = df_cb_cm['Description'].astype(str).str.strip()
+            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).str.strip()
+            df_qb_cm['Description'] = df_qb_cm['Description'].astype(str).str.strip()
+
+            # Criar df_credit_notes com as colunas principais
+            df_credit_notes = pd.DataFrame()
+            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
+            df_credit_notes['Description'] = df_qb_cm['Description']
+
+            # Função completa de normalização
+            def normalize_text(s):
+                if pd.isna(s):
+                    return ''
+                s = str(s).strip().lower()
+                s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
+                s = s.split('.')[0]  # remove decimais como '400100.0'
+                return s
+
+            # Aplicar nas colunas principais
+            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].apply(normalize_text)
+            df_cb_cm['Description'] = df_cb_cm['Description'].apply(normalize_text)
+            df_qb_cm['No.'] = df_qb_cm['No.'].apply(normalize_text)
+            df_qb_cm['Description'] = df_qb_cm['Description'].apply(normalize_text)
+            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].apply(normalize_text)
+            df_credit_notes['Description'] = df_credit_notes['Description'].apply(normalize_text)
+
+            # Coluna P - Unit Price Excl. VAT
+            df_qb_cm['merge_key'] = df_qb_cm['No.'] + "||" + df_qb_cm['Description']
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + "||" + df_cb_cm['Description']
+            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + "||" + df_credit_notes['Description']
+            unit_price_map = dict(zip(df_qb_cm['merge_key'], df_qb_cm['Amount line'] * -1))
+            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(unit_price_map)
+
+            # Coluna Q - VAT Prod. Posting Group
+            df_credit_notes['VAT Prod. Posting Group'] = ""
+
+            # Datas como datetime
+            df_cb_cm['Date From'] = pd.to_datetime(df_cb_cm['Date From'], errors='coerce')
+            df_cb_cm['Date To'] = pd.to_datetime(df_cb_cm['Date To'], errors='coerce')
+
+            date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
+            date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
+            df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key'].map(date_from_map).fillna('CHECK')
+            df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key'].map(date_to_map).fillna('CHECK')
+            df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
+
+            # Valores pequenos com deferral
+            df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
+            mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date'])
+            df_credit_notes.loc[mask_small, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
+
+            # Substituir Unit Price se Currency Code estiver preenchido
+            df_credit_notes['Currency Code'] = df_qb_cm['Currency'] if 'Currency' in df_qb_cm.columns else ""
+            df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
+            chargebee_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
+            mask_currency = df_credit_notes['Currency Code'].notna() & (df_credit_notes['Currency Code'].astype(str).str.strip() != '')
+            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_amount_map)
+
+            # Colunas adicionais fixas
+            dim_cols = [
+                "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
+                "PRICE Dimension", "PRODUCT Dimension", "RECURRENCE Dimension",
+                "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension",
+                "CUSTOMER Dimension", "Reseller Code"
+            ]
+            for col in dim_cols:
+                df_credit_notes[col] = ""
+
+            df_credit_notes['CUSTOMER Dimension'] = df_qb_cm['Parent/Customer No.'] if 'Parent/Customer No.' in df_qb_cm.columns else ""
+
+            # Reordenar colunas finais
+            final_cols = [
+                "Credit Memo No.", "Parent/Customer No.", "Subaccount No.", "Document Date", "Posting Date", "Due Date", "VAT Date", "Currency Code",
+                "Credit Note Reason Code", "Responsibility Center", "Block Overpayment", "Type", "No.", "Description", "Quantity",
+                "Unit Price Excl. VAT", "VAT Prod. Posting Group", "Deferral Code", "Deferral Start Date", "Deferral End Date",
+                "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension", "PRICE Dimension", "PRODUCT Dimension",
+                "RECURRENCE Dimension", "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension", "CUSTOMER Dimension", "Reseller Code"
+            ]
+            for col in final_cols:
+                if col not in df_credit_notes.columns:
+                    df_credit_notes[col] = ""
+            df_credit_notes = df_credit_notes[final_cols]
+
+            # Exportar para Excel
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_credit_notes.to_excel(writer, index=False, sheet_name="CreditNotes")
+            output.seek(0)
+
+            st.success("File generated")
+            st.download_button(
+                label="📅 Download Credit Notes",
+                data=output,
+                file_name=f"Hotello_Credit_Notes_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        except Exception as e:
+            st.error(f"Error during the process: {e}")
+    else:
+        st.info("⏳ Please, upload all required files above")
