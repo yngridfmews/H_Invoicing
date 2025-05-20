@@ -206,9 +206,11 @@ elif menu == "Credit Notes":
     bridge_file = st.file_uploader("Bridge (.xlsx)", type="xlsx", key="bridge_credit")
 
     if chargebee_file and quickbooks_file and bridge_file:
-        try:
-            import unicodedata
 
+        import unicodedata
+        from openpyxl.styles import numbers
+
+        try:
             # Carregamento
             df_cb_cm = pd.read_excel(chargebee_file)
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
@@ -236,9 +238,7 @@ elif menu == "Credit Notes":
             df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
-            # ====================
             # Criar df_credit_notes
-            # ====================
             df_credit_notes = pd.DataFrame()
             df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
             df_credit_notes['Description'] = df_qb_cm['Description']
@@ -246,22 +246,15 @@ elif menu == "Credit Notes":
             df_credit_notes['Description'] = df_credit_notes['Description'].astype(str).apply(normalize_str)
 
             # Column B
-            # Normalizar antes de mapear
             df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
             df_bridgecm['Customer ID'] = df_bridgecm['Customer ID'].astype(str).str.strip().str.lower()
             df_bridgecm['New Account No. for BC '] = df_bridgecm['New Account No. for BC '].astype(str).str.strip()
 
-            # Map: Credit Memo No. → Customer Id
             customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
             df_credit_notes['customer_temp'] = df_credit_notes['Credit Memo No.'].map(customer_lookup)
-
-            # Map: Customer Id → New Account No. for BC
             bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
             df_credit_notes['Parent/Customer No.'] = df_credit_notes['customer_temp'].map(bridge_lookup).fillna("CHECK")
-
-            # Remover coluna temporária
             df_credit_notes.drop(columns=['customer_temp'], inplace=True)
-
 
             # Column C
             df_credit_notes["Subaccount No."] = ""
@@ -310,23 +303,23 @@ elif menu == "Credit Notes":
             df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key'].map(date_to_map).fillna('CHECK')
             df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
 
-            # Column O ajuste com currency
+            # Ajuste com currency
             df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
             chargebee_unit_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
             mask_currency = df_credit_notes['Currency Code'].notna() & (df_credit_notes['Currency Code'].astype(str).str.strip() != '')
             df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_unit_amount_map)
 
-            # Column O ajuste small values
+            # Ajuste valores pequenos
             df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
             mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (
                 df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date']
             )
             df_credit_notes.loc[mask_small, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
 
-            # Column CUSTOMER DIMENSION
+            # CUSTOMER DIMENSION
             df_credit_notes['CUSTOMER Dimension'] = df_credit_notes['Parent/Customer No.']
 
-            # Demais dimensões e colunas fixas
+            # Outras dimensões
             dim_cols = [
                 "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
                 "PRICE Dimension", "PRODUCT Dimension", "RECURRENCE Dimension",
@@ -348,12 +341,28 @@ elif menu == "Credit Notes":
                     df_credit_notes[col] = ""
             df_credit_notes = df_credit_notes[final_cols]
 
-            # Exportar
+            # Exportar Excel com formatação de datas
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_credit_notes.to_excel(writer, index=False, sheet_name="CreditNotes")
+                workbook = writer.book
+                worksheet = writer.sheets["CreditNotes"]
+
+                date_columns = [
+                    "Document Date", "Posting Date", "Due Date",
+                    "VAT Date", "Deferral Start Date", "Deferral End Date"
+                ]
+                for col_name in date_columns:
+                    if col_name in df_credit_notes.columns:
+                        col_idx = df_credit_notes.columns.get_loc(col_name) + 1
+                        for row in range(2, len(df_credit_notes) + 2):
+                            cell = worksheet.cell(row=row, column=col_idx)
+                            if isinstance(cell.value, (datetime, pd.Timestamp)):
+                                cell.number_format = numbers.FORMAT_DATE_XLSX15
+
             output.seek(0)
 
+            # Botão de download
             st.success("✅ Credit Notes file generated.")
             st.download_button(
                 label="📥 Download Credit Notes",
