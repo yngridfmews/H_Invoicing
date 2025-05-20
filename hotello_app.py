@@ -246,9 +246,22 @@ elif menu == "Credit Notes":
             df_credit_notes['Description'] = df_credit_notes['Description'].astype(str).apply(normalize_str)
 
             # Column B
+            # Normalizar antes de mapear
+            df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
+            df_bridgecm['Customer ID'] = df_bridgecm['Customer ID'].astype(str).str.strip().str.lower()
+            df_bridgecm['New Account No. for BC '] = df_bridgecm['New Account No. for BC '].astype(str).str.strip()
+
+            # Map: Credit Memo No. → Customer Id
             customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
-            bridge_lookup_cust = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
-            df_credit_notes['Parent/Customer No.'] = df_credit_notes['Credit Memo No.'].map(customer_lookup).map(bridge_lookup_cust).fillna("CHECK")
+            df_credit_notes['customer_temp'] = df_credit_notes['Credit Memo No.'].map(customer_lookup)
+
+            # Map: Customer Id → New Account No. for BC
+            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
+            df_credit_notes['Parent/Customer No.'] = df_credit_notes['customer_temp'].map(bridge_lookup).fillna("CHECK")
+
+            # Remover coluna temporária
+            df_credit_notes.drop(columns=['customer_temp'], inplace=True)
+
 
             # Column C
             df_credit_notes["Subaccount No."] = ""
