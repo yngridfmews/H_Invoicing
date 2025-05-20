@@ -6,9 +6,6 @@ import io
 # Configuração da página
 st.set_page_config(page_title="Hotello App", layout="wide")
 
-# Sidebar com menu
-menu = st.sidebar.radio("Menu:", ["Invoice", "Credit Notes"])
-
 # --- AUTH ---
 def login():
     st.sidebar.markdown("### Login")
@@ -20,8 +17,12 @@ def login():
         return False
     return False
 
+# O MENU DEVE VIR DEPOIS DO LOGIN SER APROVADO
 if not login():
     st.stop()
+
+# Mostrar menu APÓS o login
+menu = st.sidebar.radio("Menu:", ["Invoice", "Credit Notes"])
 
 # ================================
 # INVOICE SECTION
