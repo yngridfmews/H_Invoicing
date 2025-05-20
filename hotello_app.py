@@ -195,7 +195,7 @@ if menu == "Invoice":
 
 
 # ================================
-# CREDIT NOTES SECTION
+# CREDIT NOTES SECTION (Debug Mode)
 # ================================
 elif menu == "Credit Notes":
     st.title("📉 Hotello Credit Notes Generator")
@@ -207,141 +207,29 @@ elif menu == "Credit Notes":
 
     if chargebee_file and quickbooks_file and bridge_file:
         try:
+            st.subheader("🔍 Preview dos dados carregados (debug)")
             import unicodedata
 
-            # Leitura dos arquivos
             df_cb_cm = pd.read_excel(chargebee_file)
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
 
-            # Normalização
-            def normalize_str(s):
-                if pd.isna(s):
-                    return ''
-                s = str(s).strip().lower()
-                s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
-                s = s.split('.')[0]
-                return s
+            st.markdown("#### 📘 ChargeBee Columns")
+            st.write(df_cb_cm.columns.tolist())
+            st.dataframe(df_cb_cm.head())
 
-            for col in ['Credit Note Number', 'Customer Id', 'Currency', 'Description']:
-                if col in df_cb_cm.columns:
-                    df_cb_cm[col] = df_cb_cm[col].astype(str).apply(normalize_str)
+            st.markdown("#### 📕 QuickBooks Columns")
+            st.write(df_qb_cm.columns.tolist())
+            st.dataframe(df_qb_cm.head())
 
-            for col in ['No.', 'Account No.', 'Description']:
-                if col in df_qb_cm.columns:
-                    df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
+            st.markdown("#### 📗 Bridge Columns")
+            st.write(df_bridgecm.columns.tolist())
+            st.dataframe(df_bridgecm.head())
 
-            df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
-            df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
-
-            # DataFrame final
-            df_credit_notes = pd.DataFrame()
-            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.'].astype(str).apply(normalize_str)
-            df_credit_notes['Description'] = df_qb_cm['Description'].astype(str).apply(normalize_str)
-
-            # Coluna B - Parent/Customer No.
-            customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
-            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC'].to_dict() if 'Customer ID' in df_bridgecm.columns else {}
-            df_credit_notes['Parent/Customer No.'] = df_credit_notes['Credit Memo No.'].map(customer_lookup).map(bridge_lookup).fillna('CHECK')
-
-            # Coluna C - Subaccount
-            df_credit_notes.insert(2, 'Subaccount No.', '')
-
-            # Colunas D a G - Datas
-            df_cb_cm['Date From'] = pd.to_datetime(df_cb_cm['Date From'], errors='coerce')
-            df_credit_notes['Document Date'] = df_cb_cm['Date From']
-            df_credit_notes['Posting Date'] = df_cb_cm['Date From']
-            df_credit_notes['Due Date'] = df_cb_cm['Date From']
-            df_credit_notes['VAT Date'] = df_cb_cm['Date From']
-
-            # Coluna H - Currency Code
-            currency_lookup = df_cb_cm.set_index('Credit Note Number')['Currency'].to_dict()
-            df_credit_notes['Currency Code'] = df_credit_notes['Credit Memo No.'].map(currency_lookup).apply(lambda x: "" if x == "cad" else x)
-
-            # Colunas I a L fixas
-            df_credit_notes['Credit Note Reason Code'] = 'HOT CORRECTION'
-            df_credit_notes['Responsibility Center'] = 'HOT'
-            df_credit_notes['Block Overpayment'] = 'TRUE'
-            df_credit_notes['Type'] = 'Item'
-
-            # Coluna M - No.
-            account_lookup = df_qb_cm.drop_duplicates(subset='No.')[['No.', 'Account No.']].set_index('No.')['Account No.'].to_dict()
-            credit_note_account = df_credit_notes['Credit Memo No.'].map(account_lookup)
-            item_lookup = df_bridgecm.drop_duplicates(subset='Account number').set_index('Account number')['Item'].to_dict()
-            df_credit_notes['No.'] = credit_note_account.map(item_lookup).fillna('CHECK')
-
-            # Coluna N - Quantity
-            df_credit_notes['Quantity'] = 1
-
-            # Coluna P - Unit Price Excl. VAT
-            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
-            df_qb_cm['merge_key'] = df_qb_cm['No.'] + '||' + df_qb_cm['Description']
-            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
-
-            unit_price_map = dict(zip(df_qb_cm['merge_key'], df_qb_cm['Amount line'] * -1))
-            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(unit_price_map)
-
-            # Coluna Q - VAT Prod. Posting Group
-            df_credit_notes['VAT Prod. Posting Group'] = ""
-
-            # Colunas R, S, T - Deferral
-            df_cb_cm['Date To'] = pd.to_datetime(df_cb_cm['Date To'], errors='coerce')
-            date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
-            date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
-            df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key'].map(date_from_map).fillna('CHECK')
-            df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key'].map(date_to_map).fillna('CHECK')
-            df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
-
-            # Ajustes manuais
-            df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
-            mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (
-                df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date']
-            )
-            df_credit_notes.loc[mask_small, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
-
-            # Substituir valor da Chargebee se moeda estiver preenchida
-            df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
-            cb_unit_price_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
-            mask_currency = df_credit_notes['Currency Code'].notna() & (df_credit_notes['Currency Code'].astype(str).str.strip() != '')
-            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(cb_unit_price_map)
-
-            # CUSTOMER Dimension
-            df_credit_notes['CUSTOMER Dimension'] = df_credit_notes['Parent/Customer No.']
-
-            # Demais colunas adicionais
-            for col in [
-                "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
-                "PRICE Dimension", "PRODUCT Dimension", "RECURRENCE Dimension",
-                "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension", "Reseller Code"
-            ]:
-                df_credit_notes[col] = ""
-
-            # Reordenar colunas
-            final_cols = [
-                "Credit Memo No.", "Parent/Customer No.", "Subaccount No.", "Document Date", "Posting Date", "Due Date", "VAT Date", "Currency Code",
-                "Credit Note Reason Code", "Responsibility Center", "Block Overpayment", "Type", "No.", "Description", "Quantity",
-                "Unit Price Excl. VAT", "VAT Prod. Posting Group", "Deferral Code", "Deferral Start Date", "Deferral End Date",
-                "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension", "PRICE Dimension", "PRODUCT Dimension",
-                "RECURRENCE Dimension", "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension", "CUSTOMER Dimension", "Reseller Code"
-            ]
-            df_credit_notes = df_credit_notes[final_cols]
-
-            # Exportar
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_credit_notes.to_excel(writer, index=False, sheet_name="CreditNotes")
-            output.seek(0)
-
-            st.success("✅ File generated successfully")
-            st.download_button(
-                label="📅 Download Credit Notes",
-                data=output,
-                file_name=f"Hotello_Credit_Notes_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            st.info("🔧 Se alguma coluna estiver faltando ou com nome diferente, será necessário ajustar o script de normalização.")
 
         except Exception as e:
-            st.error(f"❌ Error during the process: {e}")
+            st.error(f"❌ Erro durante carregamento dos arquivos: {e}")
     else:
         st.info("⏳ Please, upload all required files above")
 
