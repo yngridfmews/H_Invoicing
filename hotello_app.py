@@ -213,54 +213,7 @@ elif menu == "Credit Notes":
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
 
-            # Normalizacao das colunas principais
-            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].astype(str).str.strip()
-            df_cb_cm['Description'] = df_cb_cm['Description'].astype(str).str.strip()
-            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).str.strip()
-            df_qb_cm['Description'] = df_qb_cm['Description'].astype(str).str.strip()
-
-            # Criar df_credit_notes com as colunas principais
-            df_credit_notes = pd.DataFrame()
-            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
-            df_credit_notes['Description'] = df_qb_cm['Description']
-
-            # Parent/Customer No. (coluna B)
-            customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
-            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC'].to_dict()
-            df_credit_notes['Parent/Customer No.'] = (
-                df_credit_notes['Credit Memo No.']
-                .astype(str).str.strip().str.lower()
-                .map(customer_lookup)
-                .map(bridge_lookup)
-                .fillna("CHECK")
-            )
-
-            # Colunas D to G
-            df_cb_cm['Date From'] = pd.to_datetime(df_cb_cm['Date From'], errors='coerce')
-            df_credit_notes['Document Date'] = df_cb_cm['Date From']
-            df_credit_notes['Posting Date'] = df_cb_cm['Date From']
-            df_credit_notes['Due Date'] = df_cb_cm['Date From']
-            df_credit_notes['VAT Date'] = df_cb_cm['Date From']
-
-            # Coluna H - Currency Code (CAD = vazio)
-            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].astype(str).str.strip().str.lower()
-            currency_lookup = df_cb_cm.set_index('Credit Note Number')['Currency'].to_dict()
-            df_credit_notes['Currency Code'] = (
-                df_credit_notes['Credit Memo No.']
-                .map(currency_lookup)
-                .apply(lambda x: "" if x == "CAD" else x)
-            )
-
-            # Colunas I até L
-            df_credit_notes['Credit Note Reason Code'] = 'HOT CORRECTION'
-            df_credit_notes['Responsibility Center'] = 'HOT'
-            df_credit_notes['Block Overpayment'] = 'TRUE'
-            df_credit_notes['Type'] = 'Item'
-
-            # Coluna M - No.
-            df_qb_cm = df_qb_cm.dropna(subset=['No.', 'Account No.'])
-            df_bridgecm = df_bridgecm.dropna(subset=['Account number', 'Item'])
-
+            # Normalizacao inicial e normalizar textos para evitar erros de chave
             def normalize_str(s):
                 if pd.isna(s):
                     return ''
@@ -269,84 +222,99 @@ elif menu == "Credit Notes":
                 s = s.split('.')[0]
                 return s
 
-            df_qb_cm['No.'] = df_qb_cm['No.'].apply(normalize_str)
-            df_qb_cm['Account No.'] = df_qb_cm['Account No.'].apply(normalize_str)
-            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].apply(normalize_str)
-            df_bridgecm['Account number'] = df_bridgecm['Account number'].apply(normalize_str)
+            for col in ['Credit Note Number', 'Customer Id', 'Currency', 'Description']:
+                if col in df_cb_cm.columns:
+                    df_cb_cm[col] = df_cb_cm[col].astype(str).apply(normalize_str)
+
+            for col in ['No.', 'Account No.', 'Description']:
+                if col in df_qb_cm.columns:
+                    df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
+
+            df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
-            account_lookup = df_qb_cm.drop_duplicates(subset='No.').set_index('No.')['Account No.']
+            # Criar df_credit_notes
+            df_credit_notes = pd.DataFrame()
+            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
+            df_credit_notes['Description'] = df_qb_cm['Description']
+
+            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].astype(str).apply(normalize_str)
+            df_credit_notes['Description'] = df_credit_notes['Description'].astype(str).apply(normalize_str)
+
+            # Column B - Parent/Customer No.
+            customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
+            bridge_lookup_cust = df_bridgecm.set_index('Customer ID')['New Account No. for BC'].to_dict() if 'Customer ID' in df_bridgecm.columns else {}
+            df_credit_notes['Parent/Customer No.'] = df_credit_notes['Credit Memo No.'].map(customer_lookup).map(bridge_lookup_cust).fillna("CHECK")
+
+            # Column D to G - Datas
+            df_cb_cm['Date From'] = pd.to_datetime(df_cb_cm['Date From'], errors='coerce')
+            df_credit_notes['Document Date'] = df_cb_cm['Date From']
+            df_credit_notes['Posting Date'] = df_cb_cm['Date From']
+            df_credit_notes['Due Date'] = df_cb_cm['Date From']
+            df_credit_notes['VAT Date'] = df_cb_cm['Date From']
+
+            # Column H - Currency Code
+            currency_lookup = df_cb_cm.set_index('Credit Note Number')['Currency'].to_dict()
+            df_credit_notes['Currency Code'] = df_credit_notes['Credit Memo No.'].map(currency_lookup).apply(lambda x: "" if x == "cad" else x)
+
+            # Column I to L
+            df_credit_notes['Credit Note Reason Code'] = 'HOT CORRECTION'
+            df_credit_notes['Responsibility Center'] = 'HOT'
+            df_credit_notes['Block Overpayment'] = 'TRUE'
+            df_credit_notes['Type'] = 'Item'
+
+            # Column M - No.
+            account_lookup = df_qb_cm.drop_duplicates(subset='No.')[['No.', 'Account No.']].set_index('No.')['Account No.'].to_dict()
             credit_note_account = df_credit_notes['Credit Memo No.'].map(account_lookup)
-            bridge_lookup = df_bridgecm.drop_duplicates(subset='Account number').set_index('Account number')['Item'].to_dict()
-            df_credit_notes['No.'] = credit_note_account.map(bridge_lookup).fillna('CHECK')
-            
+            bridge_lookup_account = df_bridgecm.drop_duplicates(subset='Account number').set_index('Account number')['Item'].to_dict()
+            df_credit_notes['No.'] = credit_note_account.map(bridge_lookup_account).fillna('CHECK')
 
-            # Column N - Description
-            def normalize_text(s):
-                if pd.isna(s):
-                    return ''
-                s = str(s).strip().lower()
-                s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
-                s = s.split('.')[0]  # remove decimais como '400100.0'
-                return s
-
-            # Aplicar nas colunas principais
-            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].apply(normalize_text)
-            df_cb_cm['Description'] = df_cb_cm['Description'].apply(normalize_text)
-            df_qb_cm['No.'] = df_qb_cm['No.'].apply(normalize_text)
-            df_qb_cm['Description'] = df_qb_cm['Description'].apply(normalize_text)
-            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].apply(normalize_text)
-            df_credit_notes['Description'] = df_credit_notes['Description'].apply(normalize_text)
-
-            #Column O - Quantity
+            # Column N - Quantity
             df_credit_notes['Quantity'] = 1
 
-            # Coluna P - Unit Price Excl. VAT
-            df_qb_cm['merge_key'] = df_qb_cm['No.'] + "||" + df_qb_cm['Description']
-            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + "||" + df_cb_cm['Description']
-            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + "||" + df_credit_notes['Description']
+            # Column P - Unit Price Excl. VAT
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+            df_qb_cm['merge_key'] = df_qb_cm['No.'] + '||' + df_qb_cm['Description']
+            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
+
             unit_price_map = dict(zip(df_qb_cm['merge_key'], df_qb_cm['Amount line'] * -1))
             df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(unit_price_map)
 
-            # Coluna Q - VAT Prod. Posting Group
+            # Column Q - VAT Prod. Posting Group
             df_credit_notes['VAT Prod. Posting Group'] = ""
 
-            # Datas como datetime
-            df_cb_cm['Date From'] = pd.to_datetime(df_cb_cm['Date From'], errors='coerce')
+            # Deferral dates
             df_cb_cm['Date To'] = pd.to_datetime(df_cb_cm['Date To'], errors='coerce')
-
             date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
             date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
             df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key'].map(date_from_map).fillna('CHECK')
             df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key'].map(date_to_map).fillna('CHECK')
             df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
 
-            # Valores pequenos com deferral
+            # Small values
             df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
-            mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date'])
+            mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (
+                df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date']
+            )
             df_credit_notes.loc[mask_small, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
 
-            # Substituir Unit Price se Currency Code estiver preenchido
-            df_credit_notes['Currency Code'] = df_qb_cm['Currency'] if 'Currency' in df_qb_cm.columns else ""
+            # Substituir valor se tiver Currency Code
             df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
-            chargebee_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
+            chargebee_unit_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
             mask_currency = df_credit_notes['Currency Code'].notna() & (df_credit_notes['Currency Code'].astype(str).str.strip() != '')
-            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_amount_map)
+            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_unit_amount_map)
 
-            #Column Customer Dimension
-            df_credit_notes["CUSTOMER Dimension"] = df_credit_notes["Parent/Customer No."]
+            # CUSTOMER Dimension
+            df_credit_notes['CUSTOMER Dimension'] = df_credit_notes['Parent/Customer No.']
 
-            # Colunas adicionais fixas
+            # Colunas adicionais
             dim_cols = [
                 "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
                 "PRICE Dimension", "PRODUCT Dimension", "RECURRENCE Dimension",
-                "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension",
-                "CUSTOMER Dimension", "Reseller Code"
+                "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension", "Reseller Code"
             ]
             for col in dim_cols:
                 df_credit_notes[col] = ""
-
-            df_credit_notes['CUSTOMER Dimension'] = df_qb_cm['Parent/Customer No.'] if 'Parent/Customer No.' in df_qb_cm.columns else ""
 
             # Reordenar colunas finais
             final_cols = [
