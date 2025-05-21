@@ -216,9 +216,11 @@ elif menu == "Credit Notes":
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
 
-            # 🔄 Renomear '#' para 'No.' se necessário
+            # Rename columns 
             if '#' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'#': 'No.'})
+            if 'Line description' in df_qb_cm.columns:
+                df_qb_cm = df_qb_cm.rename(columns={'Line description': 'Description'})
 
             # ====================
             # Normalização
