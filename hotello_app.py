@@ -296,24 +296,23 @@ elif menu == "Credit Notes":
             df_credit_notes['Quantity'] = 1
 
             # Column Unit Price Excl. VAT
-            # Criar chaves para o mapeamento (usando Description e Account No.)
+            # Column O - merge_key para datas e valores
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'].astype(str) + '||' + df_cb_cm['Description'].astype(str)
             df_qb_cm['merge_key_desc'] = df_qb_cm['No.'].astype(str) + '||' + df_qb_cm['Description'].astype(str)
             df_qb_cm['merge_key_acc'] = df_qb_cm['No.'].astype(str) + '||' + df_qb_cm['Account No.'].astype(str)
 
             df_credit_notes['merge_key_desc'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + df_credit_notes['Description'].astype(str)
-
-            # Fazer o mapeamento com Description
-            unit_price_by_desc = dict(zip(df_qb_cm['merge_key_desc'], df_qb_cm['Amount line'] * -1))
-            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key_desc'].map(unit_price_by_desc)
-
-            # Preencher os valores faltantes usando Account No. quando Description for vazia ou NaN
-            mask_missing_price = df_credit_notes['Unit Price Excl. VAT'].isna()
             credit_note_account = df_credit_notes['Credit Memo No.'].map(
                 df_qb_cm.drop_duplicates(subset='No.')[['No.', 'Account No.']].set_index('No.')['Account No.'].to_dict()
             )
             df_credit_notes['merge_key_acc'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + credit_note_account.astype(str)
 
+            # Mapear valores por Description, fallback para Account No.
+            unit_price_by_desc = dict(zip(df_qb_cm['merge_key_desc'], df_qb_cm['Amount line'] * -1))
             unit_price_by_acc = dict(zip(df_qb_cm['merge_key_acc'], df_qb_cm['Amount line'] * -1))
+
+            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key_desc'].map(unit_price_by_desc)
+            mask_missing_price = df_credit_notes['Unit Price Excl. VAT'].isna()
             df_credit_notes.loc[mask_missing_price, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_missing_price, 'merge_key_acc'].map(unit_price_by_acc)
 
 
@@ -321,11 +320,12 @@ elif menu == "Credit Notes":
             df_credit_notes['VAT Prod. Posting Group'] = ""
 
             # Column Q-R-S
-            df_cb_cm['Date To'] = pd.to_datetime(df_cb_cm['Date To'], errors='coerce')
             date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
             date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
-            df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key'].map(date_from_map).fillna('CHECK')
-            df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key'].map(date_to_map).fillna('CHECK')
+            df_credit_notes['merge_key_cb'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + df_credit_notes['Description'].astype(str)
+
+            df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key_cb'].map(date_from_map).fillna('CHECK')
+            df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key_cb'].map(date_to_map).fillna('CHECK')
             df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
 
             # Ajuste com currency
