@@ -295,12 +295,27 @@ elif menu == "Credit Notes":
             # Column N
             df_credit_notes['Quantity'] = 1
 
-            # Column O
+            # Column Unit Price Excl. VAT
+            # Criar merge_keys padrão e alternativo
             df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+            df_cb_cm['merge_key_alt'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Account No.']
+
             df_qb_cm['merge_key'] = df_qb_cm['No.'] + '||' + df_qb_cm['Description']
+            df_qb_cm['merge_key_alt'] = df_qb_cm['No.'] + '||' + df_qb_cm['Account No.']
+
             df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
+            df_credit_notes['merge_key_alt'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['No.']
+
+            # Mapeamento de valores
             unit_price_map = dict(zip(df_qb_cm['merge_key'], df_qb_cm['Amount line'] * -1))
+            unit_price_map_alt = dict(zip(df_qb_cm['merge_key_alt'], df_qb_cm['Amount line'] * -1))
+
+            # Aplicar valor preferencialmente pelo merge_key principal, senão pelo alternativo
             df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(unit_price_map)
+            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['Unit Price Excl. VAT'].fillna(
+                df_credit_notes['merge_key_alt'].map(unit_price_map_alt)
+            )
+
 
             # Column P
             df_credit_notes['VAT Prod. Posting Group'] = ""
