@@ -223,6 +223,8 @@ elif menu == "Credit Notes":
                 df_qb_cm = df_qb_cm.rename(columns={'Line description': 'Description'})
             if 'Distribution account number' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'Distribution account number': 'Account No.'})
+            if 'Amount' in df_qb_cm.columns:
+                df_qb_cm = df_qb_cm.rename(columns={'Amount': 'Amount Line'})
 
             # ====================
             # Normalização
