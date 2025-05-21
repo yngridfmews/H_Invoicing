@@ -296,25 +296,36 @@ elif menu == "Credit Notes":
             df_credit_notes['Quantity'] = 1
 
             # Column Unit Price Excl. VAT
-            # Column O - merge_key para datas e valores
-            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'].astype(str) + '||' + df_cb_cm['Description'].astype(str)
+            # Normalizar colunas que serão usadas no merge_key do Chargebee
+            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].astype(str).apply(normalize_str)
+            df_cb_cm['Description'] = df_cb_cm['Description'].astype(str).apply(normalize_str)
+
+            # Criar merge_key no df_cb_cm para datas e valores Chargebee
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+
+            # Criar chaves para o mapeamento de valores a partir da QuickBooks
             df_qb_cm['merge_key_desc'] = df_qb_cm['No.'].astype(str) + '||' + df_qb_cm['Description'].astype(str)
             df_qb_cm['merge_key_acc'] = df_qb_cm['No.'].astype(str) + '||' + df_qb_cm['Account No.'].astype(str)
 
+            # Criar as mesmas chaves para uso no df_credit_notes
             df_credit_notes['merge_key_desc'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + df_credit_notes['Description'].astype(str)
+
+            # Obter Account No. a partir do Credit Memo para criar merge_key alternativa
             credit_note_account = df_credit_notes['Credit Memo No.'].map(
                 df_qb_cm.drop_duplicates(subset='No.')[['No.', 'Account No.']].set_index('No.')['Account No.'].to_dict()
             )
             df_credit_notes['merge_key_acc'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + credit_note_account.astype(str)
 
-            # Mapear valores por Description, fallback para Account No.
+            # Mapeamento do valor Unit Price Excl. VAT com prioridade para Description, e fallback para Account No.
             unit_price_by_desc = dict(zip(df_qb_cm['merge_key_desc'], df_qb_cm['Amount line'] * -1))
             unit_price_by_acc = dict(zip(df_qb_cm['merge_key_acc'], df_qb_cm['Amount line'] * -1))
 
+            # Aplicar primeiro por Description
             df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key_desc'].map(unit_price_by_desc)
+
+            # Se não achou por Description, tenta por Account No.
             mask_missing_price = df_credit_notes['Unit Price Excl. VAT'].isna()
             df_credit_notes.loc[mask_missing_price, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_missing_price, 'merge_key_acc'].map(unit_price_by_acc)
-
 
             # Column P
             df_credit_notes['VAT Prod. Posting Group'] = ""
