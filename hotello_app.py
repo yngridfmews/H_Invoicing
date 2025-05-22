@@ -240,10 +240,16 @@ elif menu == "Credit Notes":
             df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
-            # Criar df_credit_notes
-            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).apply(normalize_str)
+            # Criar df_credit_notes diretamente a partir de Chargebee
+            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].astype(str).apply(normalize_str)
+            df_cb_cm['Description'] = df_cb_cm['Description'].astype(str).apply(normalize_str)
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+
             df_credit_notes = pd.DataFrame()
-            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
+            df_credit_notes['Credit Memo No.'] = df_cb_cm['Credit Note Number']
+            df_credit_notes['Description'] = df_cb_cm['Description']
+            df_credit_notes['merge_key'] = df_cb_cm['merge_key']
+
 
             # Description a partir do Chargebee
             desc_lookup = df_cb_cm.drop_duplicates(subset='Credit Note Number').set_index('Credit Note Number')['Description'].to_dict()
