@@ -241,12 +241,10 @@ elif menu == "Credit Notes":
                 if col in df_cb_cm.columns:
                     df_cb_cm[col] = df_cb_cm[col].astype(str).apply(normalize_str)
 
-            # Normalizar apenas No. e Account No.
             for col in ['No.', 'Account No.']:
                 if col in df_qb_cm.columns:
                     df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
 
-            # Atribuir labels únicos para descrições em branco ou nulas
             def assign_unique_blanks(series, prefix='blank'):
                 result = []
                 blank_counter = 1
@@ -258,16 +256,16 @@ elif menu == "Credit Notes":
                         result.append(str(val).strip().lower())
                 return result
 
-            df_qb_cm['Description'] = assign_unique_blanks(df_qb_cm['Description'])
+            df_cb_cm['Description'] = assign_unique_blanks(df_cb_cm['Description'])
 
             df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
             # Criar df_credit_notes
-            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).apply(normalize_str)
+            df_cb_cm['Credit Note Number'] = df_cb_cm['Credit Note Number'].astype(str).apply(normalize_str)
             df_credit_notes = pd.DataFrame()
-            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
-            df_credit_notes['Description'] = df_qb_cm['Description']  # Já contém os 'blank1', etc.
+            df_credit_notes['Credit Memo No.'] = df_cb_cm['Credit Note Number']
+            df_credit_notes['Description'] = df_cb_cm['Description']
             df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
 
             # Column B
@@ -310,47 +308,10 @@ elif menu == "Credit Notes":
             # Column N
             df_credit_notes['Quantity'] = 1
 
-            # Column Unit Price Excl. VAT
-            # ================================
-            # UNIT PRICE EXCL. VAT - CÁLCULO COMPLETO
-            # ================================
-
-            # Criar merge_key no df_cb_cm (Chargebee)
-            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+            # Unit Price Excl. VAT diretamente da Chargebee
             df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
-            chargebee_unit_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
-
-            # Criar merge_key de descrição e conta no df_qb_cm (QuickBooks)
-            df_qb_cm['merge_key_desc'] = df_qb_cm['No.'] + '||' + df_qb_cm['Description']
-            df_qb_cm['merge_key_acc'] = df_qb_cm['No.'] + '||' + df_qb_cm['Account No.']
-            unit_price_by_desc = dict(zip(df_qb_cm['merge_key_desc'], df_qb_cm['Amount line'] * -1))
-            unit_price_by_acc = dict(zip(df_qb_cm['merge_key_acc'], df_qb_cm['Amount line'] * -1))
-
-            # Criar merge_keys equivalentes no df_credit_notes
-            df_credit_notes['merge_key_desc'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
-            credit_note_account = df_credit_notes['Credit Memo No.'].map(
-                df_qb_cm.drop_duplicates(subset='No.')[['No.', 'Account No.']].set_index('No.')['Account No.'].to_dict()
-            )
-            df_credit_notes['merge_key_acc'] = df_credit_notes['Credit Memo No.'] + '||' + credit_note_account.astype(str)
-
-            # Aplicar por descrição
-            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key_desc'].map(unit_price_by_desc)
-
-            # Fallback por conta contábil
-            mask_missing = df_credit_notes['Unit Price Excl. VAT'].isna()
-            df_credit_notes.loc[mask_missing, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_missing, 'merge_key_acc'].map(unit_price_by_acc)
-
-            # Garantir que merge_key existe no df_credit_notes para usar com Chargebee
-            if 'merge_key' not in df_credit_notes.columns:
-                df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
-
-            # Fallback por Chargebee, somente se moeda for diferente de CAD
-            mask_currency = (
-                df_credit_notes['Currency Code'].notna() &
-                (df_credit_notes['Currency Code'].astype(str).str.strip().str.lower() != 'cad') &
-                df_credit_notes['Unit Price Excl. VAT'].isna()
-            )
-            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_unit_amount_map)
+            unit_price_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
+            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(unit_price_map)
 
             # Column P
             df_credit_notes['VAT Prod. Posting Group'] = ""
@@ -358,17 +319,11 @@ elif menu == "Credit Notes":
             # Column Q-R-S
             date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
             date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
-            df_credit_notes['merge_key_cb'] = df_credit_notes['Credit Memo No.'].astype(str) + '||' + df_credit_notes['Description'].astype(str)
+            df_credit_notes['merge_key_cb'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
 
             df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key_cb'].map(date_from_map).fillna('CHECK')
             df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key_cb'].map(date_to_map).fillna('CHECK')
             df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
-
-            # Ajuste com currency
-            df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
-            chargebee_unit_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
-            mask_currency = df_credit_notes['Currency Code'].notna() & (df_credit_notes['Currency Code'].astype(str).str.strip() != '')
-            df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_unit_amount_map)
 
             # Ajuste valores pequenos
             df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
@@ -401,7 +356,6 @@ elif menu == "Credit Notes":
                 if col not in df_credit_notes.columns:
                     df_credit_notes[col] = ""
 
-            # Corrigir Description e remover linhas inválidas
             df_credit_notes['Description'] = df_credit_notes['Description'].fillna('').astype(str).replace('nan', '')
             df_credit_notes = df_credit_notes[df_credit_notes['Credit Memo No.'].notna()]
             df_credit_notes = df_credit_notes[df_credit_notes['Credit Memo No.'].astype(str).str.strip() != '']
@@ -432,7 +386,7 @@ elif menu == "Credit Notes":
             # Botão de download
             st.success("✅ Credit Notes file generated.")
             st.download_button(
-                label="📥 Download Credit Notes",
+                label="📅 Download Credit Notes",
                 data=output,
                 file_name=f"Hotello_Credit_Notes_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
