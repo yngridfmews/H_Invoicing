@@ -216,16 +216,19 @@ elif menu == "Credit Notes":
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
 
+            # Rename columns 
             if '#' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'#': 'No.'})
             if 'Distribution account number' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'Distribution account number': 'Account No.'})
 
+            # Normalização
             def normalize_str(s):
                 if pd.isna(s):
                     return ''
                 s = str(s).strip().lower()
                 s = unicodedata.normalize('NFKD', s).encode('ASCII', 'ignore').decode('utf-8')
+                s = s.split('.')[0]
                 return s
 
             for col in ['Credit Note Number', 'Customer Id', 'Currency', 'Description']:
@@ -238,25 +241,31 @@ elif menu == "Credit Notes":
 
             df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
 
-            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
-
-            df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
+            # Normalizar Account number para remover .0
+            df_qb_cm['Account No.'] = df_qb_cm['Account No.'].astype(str).str.split('.').str[0]
+            df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).str.split('.').str[0]
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
-            # Criar df_credit_notes diretamente do Chargebee
-            df_credit_notes = df_cb_cm.copy()
-            df_credit_notes.rename(columns={
-                'Credit Note Number': 'Credit Memo No.',
-                'Description': 'Description',
-                'Unit Amount': 'Unit Price Excl. VAT'
-            }, inplace=True)
+            # Criar df_credit_notes
+            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).apply(normalize_str)
+            df_credit_notes = pd.DataFrame()
+            df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
 
-            df_credit_notes['Customer Id'] = df_credit_notes['Customer Id'].astype(str).str.strip().str.lower()
+            # Description a partir do Chargebee
+            desc_lookup = df_cb_cm.drop_duplicates(subset='Credit Note Number').set_index('Credit Note Number')['Description'].to_dict()
+            df_credit_notes['Description'] = df_credit_notes['Credit Memo No.'].map(desc_lookup)
+            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
+
+            # Column B
+            df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
             df_bridgecm['Customer ID'] = df_bridgecm['Customer ID'].astype(str).str.strip().str.lower()
             df_bridgecm['New Account No. for BC '] = df_bridgecm['New Account No. for BC '].astype(str).str.strip()
 
+            customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
+            df_credit_notes['customer_temp'] = df_credit_notes['Credit Memo No.'].map(customer_lookup)
             bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
-            df_credit_notes['Parent/Customer No.'] = df_credit_notes['Customer Id'].map(bridge_lookup).fillna("CHECK")
+            df_credit_notes['Parent/Customer No.'] = df_credit_notes['customer_temp'].map(bridge_lookup).fillna("CHECK")
+            df_credit_notes.drop(columns=['customer_temp'], inplace=True)
 
             df_credit_notes["Subaccount No."] = ""
 
@@ -281,14 +290,18 @@ elif menu == "Credit Notes":
 
             df_credit_notes['Quantity'] = 1
 
+            df_cb_cm['merge_key'] = df_cb_cm['Credit Note Number'] + '||' + df_cb_cm['Description']
+            chargebee_unit_amount_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Unit Amount']))
+            df_credit_notes['Unit Price Excl. VAT'] = df_credit_notes['merge_key'].map(chargebee_unit_amount_map)
+
+            df_credit_notes['VAT Prod. Posting Group'] = ""
+
             date_from_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date From']))
             date_to_map = dict(zip(df_cb_cm['merge_key'], df_cb_cm['Date To']))
             df_credit_notes['merge_key_cb'] = df_credit_notes['merge_key']
             df_credit_notes['Deferral Start Date'] = df_credit_notes['merge_key_cb'].map(date_from_map).fillna('CHECK')
             df_credit_notes['Deferral End Date'] = df_credit_notes['merge_key_cb'].map(date_to_map).fillna('CHECK')
             df_credit_notes['Deferral Code'] = df_credit_notes['Deferral Start Date'].apply(lambda x: 'AR' if x != 'CHECK' else '')
-
-            df_credit_notes['VAT Prod. Posting Group'] = ""
 
             df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
             mask_small = (df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05) & (
