@@ -338,16 +338,6 @@ elif menu == "Credit Notes":
             )
             df_credit_notes.loc[mask_currency, 'Unit Price Excl. VAT'] = df_credit_notes.loc[mask_currency, 'merge_key'].map(chargebee_unit_amount_map)
 
-            # Converter e ajustar valores pequenos com deferral
-            df_credit_notes['Unit Price Excl. VAT'] = pd.to_numeric(df_credit_notes['Unit Price Excl. VAT'], errors='coerce')
-            mask_small = (
-                df_credit_notes['Unit Price Excl. VAT'].abs() < 0.05
-            ) & (
-                df_credit_notes['Deferral Start Date'] != df_credit_notes['Deferral End Date']
-            )
-            df_credit_notes.loc[mask_small, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
-
-
             # Column P
             df_credit_notes['VAT Prod. Posting Group'] = ""
 
