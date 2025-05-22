@@ -245,12 +245,20 @@ elif menu == "Credit Notes":
                 if col in df_qb_cm.columns:
                     df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
 
-            # Substituir descrições vazias por identificadores únicos: blank1, blank2, ...
-            blank_counter = (df_qb_cm['Description'] == '').cumsum()
-            df_qb_cm['Description'] = df_qb_cm.apply(
-                lambda row: f"blank{blank_counter[row.name]}" if row['Description'] == '' else row['Description'],
-                axis=1
-            )
+            def make_blank_labels(description_series):
+                result = []
+                blank_count = 1
+                for val in description_series:
+                    if val == '' or pd.isna(val):
+                        result.append(f'blank{blank_count}')
+                        blank_count += 1
+                    else:
+                        result.append(val)
+                return result
+
+            # Aplicar logo após normalizar a Description do df_qb_cm
+            if 'Description' in df_qb_cm.columns:
+                df_qb_cm['Description'] = make_blank_labels(df_qb_cm['Description'])
 
             df_bridgecm['Account number'] = df_bridgecm['Account number'].astype(str).apply(normalize_str)
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
