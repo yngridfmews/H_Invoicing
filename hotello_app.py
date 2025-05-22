@@ -219,6 +219,9 @@ elif menu == "Credit Notes":
                 df_qb_cm = df_qb_cm.rename(columns={'#': 'No.'})
             if 'Distribution account number' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'Distribution account number': 'Account No.'})
+            if 'Amount' in df_qb_cm.columns:
+                df_qb_cm = df_qb_cm.rename(columns={'Amount': 'Amount line'})
+            
 
             def normalize_str(s):
                 if pd.isna(s):
