@@ -400,7 +400,12 @@ elif menu == "Credit Notes":
             for col in final_cols:
                 if col not in df_credit_notes.columns:
                     df_credit_notes[col] = ""
+
+            # Corrigir Description e remover linhas inválidas
             df_credit_notes['Description'] = df_credit_notes['Description'].fillna('').astype(str).replace('nan', '')
+            df_credit_notes = df_credit_notes[df_credit_notes['Credit Memo No.'].notna()]
+            df_credit_notes = df_credit_notes[df_credit_notes['Credit Memo No.'].astype(str).str.strip() != '']
+
             df_credit_notes = df_credit_notes[final_cols]
 
             # Exportar Excel com formatação de datas
@@ -420,7 +425,7 @@ elif menu == "Credit Notes":
                         for row in range(2, len(df_credit_notes) + 2):
                             cell = worksheet.cell(row=row, column=col_idx)
                             if isinstance(cell.value, (datetime, pd.Timestamp)):
-                                cell.number_format = numbers.FORMAT_DATE_XLSX15
+                                cell.number_format = 'dd/mm/yyyy'
 
             output.seek(0)
 
