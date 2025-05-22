@@ -398,6 +398,7 @@ elif menu == "Credit Notes":
             for col in final_cols:
                 if col not in df_credit_notes.columns:
                     df_credit_notes[col] = ""
+            df_credit_notes['Description'] = df_credit_notes['Description'].fillna('').astype(str)
             df_credit_notes = df_credit_notes[final_cols]
 
             # Exportar Excel com formatação de datas
