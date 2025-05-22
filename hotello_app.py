@@ -216,7 +216,7 @@ elif menu == "Credit Notes":
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
 
-            # Rename columns 
+            # Rename columns
             if '#' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'#': 'No.'})
             if 'Distribution account number' in df_qb_cm.columns:
@@ -234,10 +234,6 @@ elif menu == "Credit Notes":
             for col in ['Credit Note Number', 'Customer Id', 'Currency', 'Description']:
                 if col in df_cb_cm.columns:
                     df_cb_cm[col] = df_cb_cm[col].astype(str).apply(normalize_str)
-
-            for col in ['No.', 'Account No.']:
-                if col in df_qb_cm.columns:
-                    df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
 
             df_cb_cm['Unit Amount'] = pd.to_numeric(df_cb_cm['Unit Amount'], errors='coerce')
 
