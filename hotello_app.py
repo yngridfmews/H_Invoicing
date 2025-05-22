@@ -254,6 +254,7 @@ elif menu == "Credit Notes":
             df_credit_notes['Description'] = df_qb_cm['Description']
             df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].astype(str).apply(normalize_str)
             df_credit_notes['Description'] = df_credit_notes['Description'].astype(str).apply(normalize_str)
+            df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
 
             # Column B
             df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
