@@ -241,19 +241,21 @@ elif menu == "Credit Notes":
                 if col in df_cb_cm.columns:
                     df_cb_cm[col] = df_cb_cm[col].astype(str).apply(normalize_str)
 
-            for col in ['No.', 'Account No.', 'Description']:
+            # Normalizar apenas No. e Account No.
+            for col in ['No.', 'Account No.']:
                 if col in df_qb_cm.columns:
                     df_qb_cm[col] = df_qb_cm[col].astype(str).apply(normalize_str)
 
+            # Atribuir labels únicos para descrições em branco ou nulas
             def assign_unique_blanks(series, prefix='blank'):
                 result = []
                 blank_counter = 1
                 for val in series:
-                    if val == '':
+                    if pd.isna(val) or str(val).strip() == '':
                         result.append(f'{prefix}{blank_counter}')
                         blank_counter += 1
                     else:
-                        result.append(val)
+                        result.append(str(val).strip().lower())
                 return result
 
             df_qb_cm['Description'] = assign_unique_blanks(df_qb_cm['Description'])
