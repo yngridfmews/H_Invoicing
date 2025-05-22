@@ -262,11 +262,10 @@ elif menu == "Credit Notes":
             df_bridgecm['Item'] = df_bridgecm['Item'].astype(str).str.strip()
 
             # Criar df_credit_notes
+            df_qb_cm['No.'] = df_qb_cm['No.'].astype(str).apply(normalize_str)
             df_credit_notes = pd.DataFrame()
             df_credit_notes['Credit Memo No.'] = df_qb_cm['No.']
-            df_credit_notes['Description'] = df_qb_cm['Description']
-            df_credit_notes['Credit Memo No.'] = df_credit_notes['Credit Memo No.'].astype(str).apply(normalize_str)
-            df_credit_notes['Description'] = df_credit_notes['Description'].astype(str).apply(normalize_str)
+            df_credit_notes['Description'] = df_qb_cm['Description']  # Já contém os 'blank1', etc.
             df_credit_notes['merge_key'] = df_credit_notes['Credit Memo No.'] + '||' + df_credit_notes['Description']
 
             # Column B
