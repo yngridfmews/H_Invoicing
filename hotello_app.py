@@ -186,6 +186,9 @@ if menu == "Invoice":
 
             # Correct deferral dates if more than 1 invoice
 
+            # Remove linhas onde 'Invoice No.' está em branco ou NaN
+            df_final = df_final[df_final['Invoice No.'].notna() & (df_final['Invoice No.'].astype(str).str.strip() != '')]
+
             # Lista com a ordem desejada das colunas
             ordered_columns = [
                 "Invoice No.","Parent/Customer No.","Subaccount No.","Document Date","Posting Date","Due Date","VAT Date","Currency Code","Type",
@@ -395,6 +398,10 @@ elif menu == "Credit Notes":
             output.seek(0)
 
             st.success("✅ Credit Notes file generated.")
+            # 👇 Aqui vem o preview da tabela
+            st.subheader("🔍 Preview of Generated Invoice File")
+            st.dataframe(df_credit_notes.head(50))
+
             st.download_button(
                 label="📥 Download Credit Notes",
                 data=output,
