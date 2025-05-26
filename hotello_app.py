@@ -399,7 +399,7 @@ elif menu == "Credit Notes":
 
             st.success("✅ Credit Notes file generated.")
             # 👇 Aqui vem o preview da tabela
-            st.subheader("🔍 Preview of Generated Invoice File")
+            st.subheader("🔍 Preview of Generated File")
             st.dataframe(df_credit_notes.head(50))
 
             st.download_button(
