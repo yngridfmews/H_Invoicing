@@ -349,7 +349,7 @@ elif menu == "Credit Notes":
             df_credit_notes['Account Matched'] = df_credit_notes['Unit Price Rounded'].map(amount_to_account)
 
             bridge_dict = df_bridgecm.drop_duplicates(subset='Account number').set_index('Account number')['Item'].to_dict()
-            df_credit_notes['No.'] = df_credit_notes['Account Matched'].map(bridge_dict).fillna('CHECK')
+            df_credit_notes['No.'] = df_credit_notes['Account Matched'].map(bridge_dict).fillna('PACKAGE')
 
             df_credit_notes['CUSTOMER Dimension'] = df_credit_notes['Parent/Customer No.']
 
