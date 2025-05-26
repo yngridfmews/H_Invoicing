@@ -172,19 +172,56 @@ if menu == "Invoice":
             )
             df_final.loc[mask_small_amount_and_deferral, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
 
+            df_final['CUSTOMER Dimension'] = df_final['Invoice No.']
+
+            new_columns = [
+                "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
+                "PRICE Dimension", "PRODUCT Dimension", "RECURRENCE Dimension",
+                "SUBPRODUCT Dimension", "TAX DEDUCTIBILITY Dimension",
+                "Reseller Code", "Apply Overpayments"]
+
+            # Adiciona cada coluna com valor vazio ""
+            for col in new_columns:
+                df_final[col] = ""
+
             # Correct deferral dates if more than 1 invoice
+
+            # Lista com a ordem desejada das colunas
+            ordered_columns = [
+                "Invoice No.","Parent/Customer No.","Subaccount No.","Document Date","Posting Date","Due Date","VAT Date","Currency Code","Type",
+                "No.","Description","Quantity","Unit Price Excl. VAT","VAT Prod. Posting Group","Deferral Code","Deferral Start Date","Deferral End Date",
+                "BU Dimension","C Dimension","ENTITY Dimension","IC Dimension","PRICE Dimension","PRODUCT Dimension","RECURRENCE Dimension",
+                "SUBPRODUCT Dimension","TAX DEDUCTIBILITY Dimension","CUSTOMER Dimension","Reseller Code","Apply Overpayments"]
+
+            # Reordenar as colunas do DataFrame
+            df_final = df_final[ordered_columns]
 
             # Exportar para Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_final.to_excel(writer, index=False, sheet_name="InvoiceData")
+                df_final.to_excel(writer, index=False, sheet_name="CreditNotes")
+                workbook = writer.book
+                worksheet = writer.sheets["CreditNotes"]
+
+                date_columns = [
+                    "Document Date", "Posting Date", "Due Date",
+                    "VAT Date", "Deferral Start Date", "Deferral End Date"
+                ]
+                for col_name in date_columns:
+                    if col_name in df_final.columns:
+                        col_idx = df_final.columns.get_loc(col_name) + 1
+                        for row in range(2, len(df_final) + 2):
+                            cell = worksheet.cell(row=row, column=col_idx)
+                            if isinstance(cell.value, (datetime, pd.Timestamp)):
+                                cell.number_format = 'dd/mm/yyyy'
+
             output.seek(0)
 
-            st.success(" File generated")
+            st.success("✅ Invoices file generated.")
             st.download_button(
-                label="📥 Download File",
+                label="📥 Download Invoices",
                 data=output,
-                file_name=f"Test_Hotello_Import_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                file_name=f"Hotello_Invoicing_{datetime.now().strftime('%Y-%m-%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
