@@ -75,7 +75,7 @@ if menu == "Invoice":
             df_final.drop(columns=['customer_temp'], inplace=True)
 
             # Additional columns
-            df_final.insert(2, 'Subaccount', '')
+            df_final.insert(2, 'Subaccount No.', '')
             df_final['Document Date'] = df_qb['Date']
             df_final['Posting Date'] = df_qb['Date']
 
