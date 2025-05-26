@@ -218,6 +218,11 @@ if menu == "Invoice":
             output.seek(0)
 
             st.success("✅ Invoices file generated.")
+
+            # 👇 Aqui vem o preview da tabela
+            st.subheader("🔍 Preview of Generated Invoice File")
+            st.dataframe(df_final.head(50))
+
             st.download_button(
                 label="📥 Download Invoices",
                 data=output,
