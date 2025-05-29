@@ -172,7 +172,7 @@ if menu == "Invoice":
             )
             df_final.loc[mask_small_amount_and_deferral, ['Deferral Code', 'Deferral Start Date', 'Deferral End Date']] = ""
 
-            df_final['CUSTOMER Dimension'] = df_final['Invoice No.']
+            df_final['CUSTOMER Dimension'] = df_final['Parent/Customer No.']
 
             new_columns = [
                 "BU Dimension", "C Dimension", "ENTITY Dimension", "IC Dimension",
