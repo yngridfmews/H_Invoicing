@@ -270,7 +270,7 @@ elif menu == "Credit Notes":
             if 'Distribution account number' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'Distribution account number': 'Account No.'})
             if 'Amount' in df_qb_cm.columns:
-                df_qb_cm = df_qb_cm.rename(columns={'Amount': 'Amount line'})
+                df_qb_cm = df_qb_cm.rename(columns={'Amount': 'Product/service amount line'})
             
 
             def normalize_str(s):
