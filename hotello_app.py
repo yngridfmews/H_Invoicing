@@ -260,6 +260,10 @@ elif menu == "Credit Notes":
             df_cb_cm = pd.read_excel(chargebee_file)
             df_qb_cm = pd.read_excel(quickbooks_file, header=3)
             df_bridgecm = pd.read_excel(bridge_file)
+        
+            # Remove lines from chargebee that has 'Tax' as Entity 
+            if 'Entity Type' in df_cb_cm.columns:
+                df_cb_cm = df_cb_cm[df_cb_cm['Entity Type'].str.strip().str.lower() != 'tax']
 
             if '#' in df_qb_cm.columns:
                 df_qb_cm = df_qb_cm.rename(columns={'#': 'No.'})
