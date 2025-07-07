@@ -45,7 +45,7 @@ if menu == "Invoice":
             # Remove lines from chargebee that has 'Tax' as Entity 
             if 'Entity Type' in df_chargebee.columns:
                 df_chargebee = df_chargebee[df_chargebee['Entity Type'].str.strip().str.lower() != 'tax']
-                
+
             st.write("QuickBooks columns:", df_qb.columns)
             df_bridge = pd.read_excel(bridge_file)
             df_customers_mi = pd.read_excel(customers_file)
@@ -127,8 +127,8 @@ if menu == "Invoice":
             }
 
             # Certifique-se que 'Account #' está no df_qb
-            df_qb['Account number'] = df_qb['Account number'].astype(str).str.strip()
-            df_final['No.'] = df_qb['Account number'].map(account_to_item).fillna("PACKAGE")
+            df_qb['Distribution account number'] = df_qb['Distribution account number'].astype(str).str.strip()
+            df_final['No.'] = df_qb['Distribution account number'].map(account_to_item).fillna("PACKAGE")
 
             # Column K - Description
             df_final['Description'] = df_chargebee['Description']
