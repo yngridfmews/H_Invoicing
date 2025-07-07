@@ -81,8 +81,8 @@ if menu == "Invoice":
 
             # Additional columns
             df_final.insert(2, 'Subaccount No.', '')
-            df_final['Document Date'] = df_qb['Date']
-            df_final['Posting Date'] = df_qb['Date']
+            df_final['Document Date'] = df_chargebee['Date From']
+            df_final['Posting Date'] = df_chargebee['Date From']
 
             days_lookup = dict(zip(
                 df_customers_mi['Column1.no_'].astype(str).str.strip(),
@@ -92,7 +92,7 @@ if menu == "Invoice":
             df_final['Document Date'] = pd.to_datetime(df_final['Document Date'], errors='coerce')
             days_to_add = df_final['Parent/Customer No.'].astype(str).str.strip().map(days_lookup).fillna(0).astype(int)
             df_final['Due Date'] = df_final['Document Date'] + pd.to_timedelta(days_to_add, unit='D')
-            df_final['VAT Date'] = df_qb['Date']
+            df_final['VAT Date'] = df_chargebee['Date From']
 
             # Column H
             df_chargebee['Currency'] = df_chargebee['Currency'].astype(str).str.strip()
