@@ -137,15 +137,15 @@ if menu == "Invoice":
             df_final['Quantity'] = 1
 
             # Column M - Unit Price Excl. VAT
-            df_chargebee['Unit Amount'] = pd.to_numeric(df_chargebee['Unit Amount'], errors='coerce')
+            df_chargebee['Amount'] = pd.to_numeric(df_chargebee['Amount'], errors='coerce')
             df_chargebee['Discount'] = pd.to_numeric(df_chargebee['Discount'], errors='coerce')
             #df_qb['Product/service amount line'] = pd.to_numeric(df_qb['Product/service amount line'], errors='coerce')
 
-            unit_amount_lookup = df_chargebee.drop_duplicates('Invoice Number').set_index('Invoice Number')['Unit Amount'].to_dict()
+            unit_amount_lookup = df_chargebee.drop_duplicates('Invoice Number').set_index('Invoice Number')['Amount'].to_dict()
 
             def get_unit_price(row):
                 if row['Currency Code'] == "":
-                    return df_chargebee.loc[row.name, 'Unit Amount']
+                    return df_chargebee.loc[row.name, 'Amount']
                 elif str(row['Description']).strip().lower() == "discount":
                     match = df_chargebee[df_chargebee['Invoice Number'] == row['Invoice No.']]
                     return match['Discount'].sum() if not match.empty else 0
