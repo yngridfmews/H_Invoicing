@@ -42,6 +42,10 @@ if menu == "Invoice":
             # Read
             df_chargebee = pd.read_excel(chargebee_file)
             df_qb = pd.read_excel(quickbooks_file)#, header=4)
+            # Remove lines from chargebee that has 'Tax' as Entity 
+            if 'Entity Type' in df_chargebee.columns:
+                df_chargebee = df_chargebee[df_chargebee['Entity Type'].str.strip().str.lower() != 'tax']
+                
             st.write("QuickBooks columns:", df_qb.columns)
             df_bridge = pd.read_excel(bridge_file)
             df_customers_mi = pd.read_excel(customers_file)
