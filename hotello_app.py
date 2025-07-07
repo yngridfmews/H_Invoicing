@@ -27,35 +27,6 @@ menu = st.sidebar.radio("Menu:", ["Invoice", "Credit Notes"])
 # ================================
 # INVOICE SECTION
 # ================================
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-import io
-
-# Configuração da página
-st.set_page_config(page_title="Hotello App", layout="wide")
-
-# --- AUTH ---
-def login():
-    st.sidebar.markdown("### Login")
-    password = st.sidebar.text_input("Enter password:", type="password")
-    if password == st.secrets["auth_password"]:
-        return True
-    elif password:
-        st.sidebar.error("Incorrect password")
-        return False
-    return False
-
-# O MENU DEVE VIR DEPOIS DO LOGIN SER APROVADO
-if not login():
-    st.stop()
-
-# Mostrar menu APÓS o login
-menu = st.sidebar.radio("Menu:", ["Invoice", "Credit Notes"])
-
-# ================================
-# INVOICE SECTION
-# ================================
 if menu == "Invoice":
     st.title("📊 Hotello Invoice Generator")
     st.write("Upload the files below for Invoice processing.")
