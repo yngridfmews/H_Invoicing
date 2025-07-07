@@ -435,7 +435,7 @@ st.set_page_config(page_title="Hotello App", layout="wide")
 # --- AUTH ---
 def login():
     st.sidebar.markdown("### Login")
-    password = st.sidebar.text_input("Enter password:", type="password")
+    password = st.sidebar.text_input("Enter password:", type="password", key="login_password")
     if password == st.secrets["auth_password"]:
         return True
     elif password:
