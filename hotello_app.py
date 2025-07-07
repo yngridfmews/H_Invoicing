@@ -56,7 +56,7 @@ if menu == "Invoice":
             df_bridge['Customer ID'] = df_bridge['Customer ID'].astype(str).str.strip().str.lower()
             df_bridge['Subscription No.'] = df_bridge['Subscription No.'].astype(str).str.strip().str.lower()
             df_bridge['Name'] = df_bridge['Name'].astype(str).str.strip().str.lower()
-            df_bridge['New Account No. for BC '] = df_bridge['New Account No. for BC '].astype(str).str.strip()
+            df_bridge['New Account No. for BC'] = df_bridge['New Account No. for BC'].astype(str).str.strip()
 
             df_final = pd.DataFrame()
             df_final['Invoice No.'] = df_chargebee.iloc[:, 0].astype(str).str.strip().str.lower()
@@ -65,13 +65,13 @@ if menu == "Invoice":
             df_final['customer_temp'] = df_final['Invoice No.'].map(customer_id_lookup)
 
             bridge_long = df_bridge.melt(
-                id_vars='New Account No. for BC ',
+                id_vars='New Account No. for BC',
                 value_vars=['Customer ID', 'Subscription No.', 'Name'],
                 value_name='lookup_value'
             ).drop(columns='variable')
 
             bridge_long['lookup_value'] = bridge_long['lookup_value'].astype(str).str.strip().str.lower()
-            full_bridge_lookup = dict(zip(bridge_long['lookup_value'], bridge_long['New Account No. for BC ']))
+            full_bridge_lookup = dict(zip(bridge_long['lookup_value'], bridge_long['New Account No. for BC']))
             df_final['Parent/Customer No.'] = df_final['customer_temp'].map(full_bridge_lookup).fillna('CHECK')
             df_final.drop(columns=['customer_temp'], inplace=True)
 
@@ -307,10 +307,10 @@ elif menu == "Credit Notes":
 
             df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
             df_bridgecm['Customer ID'] = df_bridgecm['Customer ID'].astype(str).str.strip().str.lower()
-            df_bridgecm['New Account No. for BC '] = df_bridgecm['New Account No. for BC '].astype(str).str.strip()
+            df_bridgecm['New Account No. for BC'] = df_bridgecm['New Account No. for BC'].astype(str).str.strip()
 
             customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
-            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
+            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC'].to_dict()
             df_credit_notes['customer_temp'] = df_credit_notes['Credit Memo No.'].map(customer_lookup)
             df_credit_notes['Parent/Customer No.'] = df_credit_notes['customer_temp'].map(bridge_lookup).fillna("CHECK")
             df_credit_notes.drop(columns=['customer_temp'], inplace=True)
@@ -482,7 +482,7 @@ if menu == "Invoice":
             df_bridge['Customer ID'] = df_bridge['Customer ID'].astype(str).str.strip().str.lower()
             df_bridge['Subscription No.'] = df_bridge['Subscription No.'].astype(str).str.strip().str.lower()
             df_bridge['Name'] = df_bridge['Name'].astype(str).str.strip().str.lower()
-            df_bridge['New Account No. for BC '] = df_bridge['New Account No. for BC '].astype(str).str.strip()
+            df_bridge['New Account No. for BC'] = df_bridge['New Account No. for BC'].astype(str).str.strip()
 
             df_final = pd.DataFrame()
             df_final['Invoice No.'] = df_qb.iloc[:, 0].astype(str).str.strip().str.lower()
@@ -491,13 +491,13 @@ if menu == "Invoice":
             df_final['customer_temp'] = df_final['Invoice No.'].map(customer_id_lookup)
 
             bridge_long = df_bridge.melt(
-                id_vars='New Account No. for BC ',
+                id_vars='New Account No. for BC',
                 value_vars=['Customer ID', 'Subscription No.', 'Name'],
                 value_name='lookup_value'
             ).drop(columns='variable')
 
             bridge_long['lookup_value'] = bridge_long['lookup_value'].astype(str).str.strip().str.lower()
-            full_bridge_lookup = dict(zip(bridge_long['lookup_value'], bridge_long['New Account No. for BC ']))
+            full_bridge_lookup = dict(zip(bridge_long['lookup_value'], bridge_long['New Account No. for BC']))
             df_final['Parent/Customer No.'] = df_final['customer_temp'].map(full_bridge_lookup).fillna('CHECK')
             df_final.drop(columns=['customer_temp'], inplace=True)
 
@@ -727,10 +727,10 @@ elif menu == "Credit Notes":
 
             df_cb_cm['Customer Id'] = df_cb_cm['Customer Id'].astype(str).str.strip().str.lower()
             df_bridgecm['Customer ID'] = df_bridgecm['Customer ID'].astype(str).str.strip().str.lower()
-            df_bridgecm['New Account No. for BC '] = df_bridgecm['New Account No. for BC '].astype(str).str.strip()
+            df_bridgecm['New Account No. for BC'] = df_bridgecm['New Account No. for BC'].astype(str).str.strip()
 
             customer_lookup = df_cb_cm.set_index('Credit Note Number')['Customer Id'].to_dict()
-            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC '].to_dict()
+            bridge_lookup = df_bridgecm.set_index('Customer ID')['New Account No. for BC'].to_dict()
             df_credit_notes['customer_temp'] = df_credit_notes['Credit Memo No.'].map(customer_lookup)
             df_credit_notes['Parent/Customer No.'] = df_credit_notes['customer_temp'].map(bridge_lookup).fillna("CHECK")
             df_credit_notes.drop(columns=['customer_temp'], inplace=True)
