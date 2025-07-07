@@ -99,26 +99,32 @@ if menu == "Invoice":
             df_final['Type'] = 'Item'
 
             # Column J - No.
-            df_bridge['Account number'] = df_bridge['Account number'].astype(str).str.strip()
-            df_bridge['Item'] = df_bridge['Item'].astype(str).str.strip()
-            account_to_item = dict(zip(df_bridge['Account number'], df_bridge['Item']))
-            df_final['No.'] = df_qb['#']
+            # Column J - No. (simplified version)
+            account_to_item = {
+                "400100": "INST",
+                "400200": "PACKAGE",
+                "400203": "ARIANE",
+                "400210": "PACKAGE",
+                "400220": "PACKAGE",
+                "400250": "INST",
+                "400251": "INST",
+                "400252": "INST",
+                "400253": "INST",
+                "400300": "INST",
+                "400301": "INST",
+                "400302": "INST",
+                "400400": "OTHER",
+                "400500": "OTHER",
+                "401010": "HW",
+                "401050": "INST",
+                "401060": "HW",
+                "430010": "OTHER",
+                "460310": "PAYMENTS"
+            }
 
-            def compute_no(row):
-                try:
-                    account_str = str(int(row['Account #'])) if pd.notna(row['Account #']) else ''
-                    lookup_item = account_to_item.get(account_str, account_str)
-                    if lookup_item == "49000":
-                        no_value = str(row['No.']) if pd.notna(row['No.']) else ""
-                        if '-' in no_value:
-                            return no_value.split('-')[-1].strip()
-                        return ""
-                    else:
-                        return lookup_item
-                except:
-                    return "PACKAGE"
-
-            df_final['No.'] = df_final.apply(compute_no, axis=1)
+            # Certifique-se que 'Account #' está no df_qb
+            df_qb['Account #'] = df_qb['Account #'].astype(str).str.strip()
+            df_final['No.'] = df_qb['Account #'].map(account_to_item).fillna("PACKAGE")
 
             # Column K - Description
             df_final['Description'] = df_qb['Product/service description']
